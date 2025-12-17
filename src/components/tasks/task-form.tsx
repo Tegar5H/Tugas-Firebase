@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Sparkles, X } from "lucide-react";
 import type { Task } from "@/lib/types";
 import { createTask, updateTask, getLabelSuggestions } from "@/lib/actions";
+import { useUser } from "@/firebase";
 
 const formSchema = z.object({
   title: z.string().min(2, "Title must be at least 2 characters."),
@@ -48,6 +49,7 @@ type TaskFormProps = {
 };
 
 export function TaskForm({ task, isOpen, onOpenChange }: TaskFormProps) {
+  const { user } = useUser();
   const [isPending, startTransition] = useTransition();
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -114,10 +116,19 @@ export function TaskForm({ task, isOpen, onOpenChange }: TaskFormProps) {
 
 
   const onSubmit = (values: TaskFormValues) => {
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Not authenticated",
+        description: "You must be logged in to create a task.",
+      });
+      return;
+    }
+
     startTransition(async () => {
       const result = task 
-        ? await updateTask(task.id, values) 
-        : await createTask(values);
+        ? await updateTask(user.uid, task.id, values) 
+        : await createTask(user.uid, values);
 
       if (result?.error) {
         toast({

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useTransition } from "react";
@@ -41,10 +42,12 @@ import { useToast } from "@/hooks/use-toast";
 import Image from "next/image";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { cn } from "@/lib/utils";
+import { useUser } from "@/firebase";
 
 type SortOption = "createdAt_desc" | "createdAt_asc";
 
 export function TaskList({ initialTasks }: { initialTasks: Task[] }) {
+  const { user } = useUser();
   const [filter, setFilter] = useState("all");
   const [sort, setSort] = useState<SortOption>("createdAt_desc");
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -65,8 +68,9 @@ export function TaskList({ initialTasks }: { initialTasks: Task[] }) {
   }
 
   const handleDelete = (taskId: string) => {
+    if (!user) return;
     startTransition(async () => {
-      const result = await deleteTask(taskId);
+      const result = await deleteTask(user.uid, taskId);
       if (result.error) {
         toast({
           variant: "destructive",
@@ -82,9 +86,10 @@ export function TaskList({ initialTasks }: { initialTasks: Task[] }) {
   };
 
   const handleStatusChange = (taskId: string, currentStatus: Task['status']) => {
+    if (!user) return;
     startTransition(async () => {
       const newStatus = currentStatus === 'done' ? 'todo' : 'done';
-      await updateTaskStatus(taskId, newStatus);
+      await updateTaskStatus(user.uid, taskId, newStatus);
     });
   };
 

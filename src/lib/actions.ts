@@ -1,12 +1,12 @@
 
 "use server";
 
-import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, where, Timestamp, orderBy, limit } from "firebase/firestore";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, Timestamp, orderBy, limit } from "firebase/firestore";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { Task } from "@/lib/types";
 import { suggestTaskLabels } from "@/ai/flows/suggest-task-labels";
-import { getAuthenticatedAppForUser } from "@/lib/firebase-admin";
+import { initializeFirebase } from "@/firebase/server-init";
 
 const TaskSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -19,7 +19,7 @@ const TaskSchema = z.object({
 
 export async function getTasks(userId: string) {
   if (!userId) return [];
-  const { firestore } = await getAuthenticatedAppForUser();
+  const { firestore } = initializeFirebase();
   const tasksCol = collection(firestore, "users", userId, "tasks");
   const q = query(tasksCol, orderBy("createdAt", "desc"));
   const taskSnapshot = await getDocs(q);
@@ -37,7 +37,7 @@ export async function getTasks(userId: string) {
 
 export async function getDashboardTasks(userId: string) {
   if (!userId) return { recent: [], dueToday: [] };
-  const { firestore } = await getAuthenticatedAppForUser();
+  const { firestore } = initializeFirebase();
   const tasksCol = collection(firestore, "users", userId, "tasks");
 
   const recentQuery = query(
@@ -62,10 +62,8 @@ export async function getDashboardTasks(userId: string) {
   return { recent, dueToday };
 }
 
-export async function createTask(values: z.infer<typeof TaskSchema>) {
-  const { auth } = await getAuthenticatedAppForUser();
-
-  if (!auth.uid) {
+export async function createTask(userId: string, values: z.infer<typeof TaskSchema>) {
+  if (!userId) {
     return { error: "User not authenticated." };
   }
 
@@ -76,10 +74,9 @@ export async function createTask(values: z.infer<typeof TaskSchema>) {
   }
   
   const { title, description, deadline, labels } = parsed.data;
-  const userId = auth.uid;
 
   try {
-    const { firestore } = await getAuthenticatedAppForUser();
+    const { firestore } = initializeFirebase();
     const taskData = {
       userId,
       title,
@@ -98,10 +95,7 @@ export async function createTask(values: z.infer<typeof TaskSchema>) {
   }
 }
 
-export async function updateTask(taskId: string, values: z.infer<typeof TaskSchema>) {
-  const { auth } = await getAuthenticatedAppForUser();
-  const userId = auth.uid;
-  
+export async function updateTask(userId: string, taskId: string, values: z.infer<typeof TaskSchema>) {
   if (!userId) {
     return { error: "User not authenticated." };
   }
@@ -115,7 +109,7 @@ export async function updateTask(taskId: string, values: z.infer<typeof TaskSche
   const { title, description, deadline, labels, status } = parsed.data;
   
   try {
-    const { firestore } = await getAuthenticatedAppForUser();
+    const { firestore } = initializeFirebase();
     const taskRef = doc(firestore, "users", userId, "tasks", taskId);
     const taskData = {
       title,
@@ -133,13 +127,11 @@ export async function updateTask(taskId: string, values: z.infer<typeof TaskSche
   }
 }
 
-export async function updateTaskStatus(taskId: string, status: 'todo' | 'in-progress' | 'done') {
-  const { auth } = await getAuthenticatedAppForUser();
-  const userId = auth.uid;
+export async function updateTaskStatus(userId: string, taskId: string, status: 'todo' | 'in-progress' | 'done') {
   if (!userId) return { error: "User not authenticated." };
 
   try {
-    const { firestore } = await getAuthenticatedAppForUser();
+    const { firestore } = initializeFirebase();
     const taskRef = doc(firestore, "users", userId, "tasks", taskId);
     await updateDoc(taskRef, { status });
     revalidatePath('/dashboard');
@@ -150,13 +142,11 @@ export async function updateTaskStatus(taskId: string, status: 'todo' | 'in-prog
   }
 }
 
-export async function deleteTask(taskId: string) {
-  const { auth } = await getAuthenticatedAppForUser();
-  const userId = auth.uid;
+export async function deleteTask(userId: string, taskId: string) {
   if (!userId) return { error: "User not authenticated." };
 
   try {
-    const { firestore } = await getAuthenticatedAppForUser();
+    const { firestore } = initializeFirebase();
     await deleteDoc(doc(firestore, "users", userId, "tasks", taskId));
     revalidatePath("/dashboard");
     revalidatePath("/tasks");
