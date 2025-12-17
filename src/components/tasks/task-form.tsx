@@ -26,19 +26,15 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Loader2, Sparkles, X } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { Loader2, Sparkles, X } from "lucide-react";
 import type { Task } from "@/lib/types";
 import { createTask, updateTask, getLabelSuggestions } from "@/lib/actions";
 
 const formSchema = z.object({
   title: z.string().min(2, "Title must be at least 2 characters."),
   description: z.string().optional(),
-  deadline: z.date().nullable(),
+  deadline: z.string().nullable(),
   labels: z.array(z.string()),
   status: z.enum(["todo", "in-progress", "done"]).optional(),
 });
@@ -53,8 +49,6 @@ export function TaskForm({ task, isOpen, onOpenChange }: TaskFormProps) {
   const [isPending, startTransition] = useTransition();
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const router = useRouter();
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -62,7 +56,7 @@ export function TaskForm({ task, isOpen, onOpenChange }: TaskFormProps) {
     defaultValues: {
       title: task?.title || "",
       description: task?.description || "",
-      deadline: task?.deadline?.toDate() || null,
+      deadline: task?.deadline || null,
       labels: task?.labels || [],
       status: task?.status || "todo",
     },
@@ -115,7 +109,7 @@ export function TaskForm({ task, isOpen, onOpenChange }: TaskFormProps) {
       formData.append("title", values.title);
       formData.append("description", values.description || "");
       if (values.deadline) {
-        formData.append("deadline", values.deadline.toISOString());
+        formData.append("deadline", values.deadline);
       }
       formData.append("labels", JSON.stringify(values.labels));
       if (task) {
@@ -183,39 +177,11 @@ export function TaskForm({ task, isOpen, onOpenChange }: TaskFormProps) {
               control={form.control}
               name="deadline"
               render={({ field }) => (
-                <FormItem className="flex flex-col">
+                <FormItem>
                   <FormLabel>Deadline</FormLabel>
-                  <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                        >
-                          {field.value ? (
-                            format(field.value, "PPP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value ?? undefined}
-                        onSelect={(date) => {
-                            field.onChange(date);
-                            setIsCalendarOpen(false);
-                        }}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <FormControl>
+                    <Input placeholder="e.g., Tomorrow at 5pm" {...field} value={field.value ?? ""} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

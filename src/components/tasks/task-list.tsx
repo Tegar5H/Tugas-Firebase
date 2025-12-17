@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useTransition } from "react";
 import type { Task } from "@/lib/types";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -40,8 +40,9 @@ import { deleteTask, updateTaskStatus } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
 import Image from "next/image";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
+import { cn } from "@/lib/utils";
 
-type SortOption = "createdAt_desc" | "createdAt_asc" | "deadline_asc" | "deadline_desc";
+type SortOption = "createdAt_desc" | "createdAt_asc";
 
 export function TaskList({ initialTasks }: { initialTasks: Task[] }) {
   const [filter, setFilter] = useState("all");
@@ -106,14 +107,6 @@ export function TaskList({ initialTasks }: { initialTasks: Task[] }) {
           return b.createdAt.toMillis() - a.createdAt.toMillis();
         case "createdAt_asc":
           return a.createdAt.toMillis() - b.createdAt.toMillis();
-        case "deadline_asc":
-          if (!a.deadline) return 1;
-          if (!b.deadline) return -1;
-          return a.deadline.toMillis() - b.deadline.toMillis();
-        case "deadline_desc":
-          if (!a.deadline) return 1;
-          if (!b.deadline) return -1;
-          return b.deadline.toMillis() - a.deadline.toMillis();
         default:
           return 0;
       }
@@ -125,8 +118,6 @@ export function TaskList({ initialTasks }: { initialTasks: Task[] }) {
   const sortLabels: Record<SortOption, string> = {
     createdAt_desc: "Newest First",
     createdAt_asc: "Oldest First",
-    deadline_asc: "Deadline Asc",
-    deadline_desc: "Deadline Desc",
   };
 
   return (
@@ -158,8 +149,6 @@ export function TaskList({ initialTasks }: { initialTasks: Task[] }) {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setSort("createdAt_desc")}>Newest First</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setSort("createdAt_asc")}>Oldest First</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSort("deadline_asc")}>Deadline Asc</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSort("deadline_desc")}>Deadline Desc</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -189,8 +178,8 @@ export function TaskList({ initialTasks }: { initialTasks: Task[] }) {
                     <div className="flex items-center gap-4 text-sm text-muted-foreground pt-1">
                       <span>Created {formatDistanceToNow(task.createdAt.toDate(), { addSuffix: true })}</span>
                       {task.deadline && (
-                         <Badge variant={new Date(task.deadline.toDate()) < new Date() && task.status !== 'done' ? "destructive" : "outline"}>
-                            Due {format(task.deadline.toDate(), 'MMM d, yyyy')}
+                         <Badge variant={"outline"}>
+                            Due: {task.deadline}
                         </Badge>
                       )}
                     </div>

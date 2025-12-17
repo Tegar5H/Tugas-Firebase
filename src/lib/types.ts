@@ -5,7 +5,7 @@ export type Task = {
   title: string;
   description: string;
   status: 'todo' | 'in-progress' | 'done';
-  deadline: Timestamp | null;
+  deadline: string | null;
   labels: string[];
   userId: string;
   createdAt: Timestamp;
