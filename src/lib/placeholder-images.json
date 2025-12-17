@@ -1,3 +1,16 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "login-background",
+      "description": "Abstract background for login page",
+      "imageUrl": "https://images.unsplash.com/photo-1592342001587-51d958a5bed3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxhYnN0cmFjdCUyMGxpbmVzfGVufDB8fHx8MTc2NTg4NDI2M3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "abstract lines"
+    },
+    {
+      "id": "empty-tasks",
+      "description": "Illustration for empty tasks list",
+      "imageUrl": "https://images.unsplash.com/photo-1728581665799-f22e6920f681?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8d29ya3NwYWNlJTIwbWluaW1hbHxlbnwwfHx8fDE3NjU5NDc3MTB8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "workspace minimal"
+    }
+  ]
 }

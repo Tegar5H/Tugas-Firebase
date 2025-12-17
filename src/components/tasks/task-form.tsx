@@ -1,0 +1,264 @@
+"use client";
+
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
+
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Badge } from "@/components/ui/badge";
+import { CalendarIcon, Loader2, Sparkles, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import type { Task } from "@/lib/types";
+import { createTask, updateTask, getLabelSuggestions } from "@/lib/actions";
+
+const formSchema = z.object({
+  title: z.string().min(2, "Title must be at least 2 characters."),
+  description: z.string().optional(),
+  deadline: z.date().nullable(),
+  labels: z.array(z.string()),
+  status: z.enum(["todo", "in-progress", "done"]).optional(),
+});
+
+type TaskFormProps = {
+  task?: Task;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+};
+
+export function TaskForm({ task, isOpen, onOpenChange }: TaskFormProps) {
+  const [isPending, startTransition] = useTransition();
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      title: task?.title || "",
+      description: task?.description || "",
+      deadline: task?.deadline?.toDate() || null,
+      labels: task?.labels || [],
+      status: task?.status || "todo",
+    },
+  });
+
+  const handleSuggestLabels = async () => {
+    const title = form.getValues("title");
+    const description = form.getValues("description");
+    if (!title) {
+        toast({
+            variant: "destructive",
+            title: "Title is required",
+            description: "Please enter a title to get suggestions.",
+        });
+        return;
+    }
+
+    setIsSuggesting(true);
+    const result = await getLabelSuggestions(title, description || "");
+    if(result.labels){
+        setSuggestions(result.labels);
+    } else {
+        toast({
+            variant: "destructive",
+            title: "Suggestion failed",
+            description: result.error,
+        });
+    }
+    setIsSuggesting(false);
+  }
+
+  const toggleLabel = (label: string) => {
+    const currentLabels = form.getValues("labels");
+    const newLabels = currentLabels.includes(label)
+      ? currentLabels.filter((l) => l !== label)
+      : [...currentLabels, label];
+    form.setValue("labels", newLabels, { shouldDirty: true });
+  };
+  
+  const removeLabel = (label: string) => {
+    const currentLabels = form.getValues("labels");
+    const newLabels = currentLabels.filter(l => l !== label);
+    form.setValue("labels", newLabels, { shouldDirty: true });
+  };
+
+
+  const onSubmit = (values: z.infer<typeof formSchema>) => {
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.append("title", values.title);
+      formData.append("description", values.description || "");
+      if (values.deadline) {
+        formData.append("deadline", values.deadline.toISOString());
+      }
+      formData.append("labels", JSON.stringify(values.labels));
+      if (task) {
+        formData.append("status", values.status || 'todo');
+      }
+
+      const result = task ? await updateTask(task.id, formData) : await createTask(formData);
+
+      if (result.error) {
+        toast({
+          variant: "destructive",
+          title: "An error occurred",
+          description: "Could not save the task. Please try again.",
+        });
+      } else {
+        toast({
+          title: task ? "Task updated" : "Task created",
+          description: `"${values.title}" has been saved.`,
+        });
+        onOpenChange(false);
+        form.reset();
+        setSuggestions([]);
+      }
+    });
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>{task ? "Edit Task" : "Create Task"}</DialogTitle>
+          <DialogDescription>
+            {task ? "Update your task details." : "Add a new task to your list."}
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Title</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Finalize project report" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Add more details..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="deadline"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Deadline</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value ? (
+                            format(field.value, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value ?? undefined}
+                        onSelect={field.onChange}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+                control={form.control}
+                name="labels"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Labels</FormLabel>
+                        <div className="flex items-center gap-2 mb-2">
+                             <Button type="button" variant="outline" size="sm" onClick={handleSuggestLabels} disabled={isSuggesting}>
+                                {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4"/>}
+                                Suggest
+                             </Button>
+                        </div>
+                        {suggestions.length > 0 && (
+                            <div className="flex flex-wrap gap-2 p-2 border rounded-md bg-muted/50">
+                                {suggestions.map((suggestion) => (
+                                    <Badge key={suggestion} variant="secondary" className="cursor-pointer" onClick={() => toggleLabel(suggestion)}>{suggestion}</Badge>
+                                ))}
+                            </div>
+                        )}
+                         <div className="flex flex-wrap gap-2">
+                            {field.value.map((label) => (
+                                <Badge key={label} variant="default">
+                                    {label}
+                                    <button type="button" onClick={() => removeLabel(label)} className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                                        <X className="h-3 w-3 text-primary-foreground hover:text-white" />
+                                        <span className="sr-only">Remove {label}</span>
+                                    </button>
+                                </Badge>
+                            ))}
+                        </div>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
+            <DialogFooter>
+              <Button type="submit" disabled={isPending}>
+                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {task ? "Save Changes" : "Create Task"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
