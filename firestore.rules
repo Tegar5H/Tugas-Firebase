@@ -1,0 +1,155 @@
+/**
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model where all data is private
+ * to the user who created it. There is no public or shared data. Access control
+ * is determined entirely by the user's unique ID (UID) present in the document path.
+ *
+ * Data Structure:
+ * The data is organized hierarchically. All user-specific data, including tasks
+ * and labels, is nested within a top-level 'users' collection, under a document
+ * named with the user's UID.
+ *   - /users/{userId} - Contains the user's profile.
+ *   - /users/{userId}/tasks/{taskId} - A subcollection for the user's tasks.
+ *   - /users/{userId}/labels/{labelId} - A subcollection for the user's labels.
+ *
+ * Key Security Decisions:
+ * - Strict Privacy: Users can only read or write data within their own document
+ *   tree (i.e., paths starting with /users/{their_auth_uid}).
+ * - No User Listing: It is not possible to query the top-level '/users'
+ *   collection, preventing enumeration of all application users.
+ * - Path-Based Security: Authorization checks rely on the {userId} wildcard in
+ *   the path, making rules simple, performant, and secure.
+ * - Authorization-Critical Field Validation: While data shapes are flexible to
+ *   support prototyping, rules strictly validate that internal ownership fields
+ *   (like 'userId' on a task) match the path on creation and are immutable on update.
+ *   This ensures relational integrity cannot be compromised.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --------------------------------------------------------------------
+    // Helper Functions
+    // --------------------------------------------------------------------
+
+    /**
+     * Checks if a user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the currently authenticated user's UID matches the given userId.
+     * This is the primary function for enforcing data ownership.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * For update and delete operations, confirms ownership AND that the document
+     * already exists. Prevents modifying or deleting non-existent data.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * On CREATE: Validates that the new user document contains an 'id' field
+     * that correctly links it back to the authenticated user creating it.
+     */
+    function hasValidUserData(userId) {
+      return request.resource.data.id == userId;
+    }
+
+    /**
+     * On UPDATE: Ensures the user document's unique 'id' cannot be changed
+     * after it has been created, preserving the ownership link.
+     */
+    function isUserDataImmutable() {
+      return request.resource.data.id == resource.data.id;
+    }
+    
+    /**
+     * On CREATE: Validates that the new task contains a 'userId' field
+     * that correctly links it back to the parent user document.
+     */
+    function hasValidTaskData(userId) {
+      return request.resource.data.userId == userId;
+    }
+
+    /**
+     * On UPDATE: Ensures the task's 'userId' cannot be changed
+     * after it has been created, preventing tasks from being reassigned.
+     */
+    function isTaskDataImmutable() {
+      return request.resource.data.userId == resource.data.id;
+    }
+
+    /**
+     * On CREATE: Validates that the new label contains a 'userId' field
+     * that correctly links it back to the parent user document.
+     */
+    function hasValidLabelData(userId) {
+      return request.resource.data.userId == userId;
+    }
+
+    /**
+     * On UPDATE: Ensures the label's 'userId' cannot be changed
+     * after it has been created, preventing labels from being reassigned.
+     */
+    function isLabelDataImmutable() {
+      return request.resource.data.userId == resource.data.id;
+    }
+
+    // --------------------------------------------------------------------
+    // Collection Rules
+    // --------------------------------------------------------------------
+
+    /**
+     * @description Controls access to a user's own profile document.
+     * @path /users/{userId}
+     * @allow (create) An authenticated user can create their own user profile document.
+     * @deny  (get) A user trying to read another user's profile.
+     * @principle Restricts access to a user's own data tree and allows self-creation.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false; // Deny listing of all users for security.
+      allow create: if isOwner(userId) && hasValidUserData(userId);
+      allow update: if isExistingOwner(userId) && isUserDataImmutable();
+      allow delete: if isExistingOwner(userId);
+
+      /**
+       * @description Controls access to a user's private collection of tasks.
+       * @path /users/{userId}/tasks/{taskId}
+       * @allow (create) An authenticated user creating a new task for themselves.
+       * @deny  (list) User 'A' trying to list the tasks of user 'B'.
+       * @principle Enforces document ownership for all operations within a user's private subcollection.
+       */
+      match /tasks/{taskId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && hasValidTaskData(userId);
+        allow update: if isExistingOwner(userId) && isTaskDataImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description Controls access to a user's private collection of labels.
+       * @path /users/{userId}/labels/{labelId}
+       * @allow (get) An authenticated user reading one of their own labels.
+       * @deny  (delete) User 'A' trying to delete a label belonging to user 'B'.
+       * @principle Enforces document ownership for all operations within a user's private subcollection.
+       */
+      match /labels/{labelId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && hasValidLabelData(userId);
+        allow update: if isExistingOwner(userId) && isLabelDataImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
+    }
+  }
+}

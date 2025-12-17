@@ -1,0 +1,165 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the TaskinAja application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user.",
+          "format": "email"
+        }
+      },
+      "required": [
+        "id",
+        "email"
+      ]
+    },
+    "Task": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Task",
+      "type": "object",
+      "description": "Represents a task within the TaskinAja application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Task entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Task)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the task."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the task."
+        },
+        "deadline": {
+          "type": "string",
+          "description": "The date and time when the task is due.",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the task (e.g., 'completed', 'incomplete')."
+        },
+        "labelIds": {
+          "type": "array",
+          "description": "References to Labels. (Relationship: Task N:N Label)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "title",
+        "description",
+        "deadline",
+        "status"
+      ]
+    },
+    "Label": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Label",
+      "type": "object",
+      "description": "Represents a label or category for tasks.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Label entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the label."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Label)"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "userId"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profile information.  The 'userId' parameter corresponds to the Firebase Auth UID.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user, matching the Firebase Auth UID."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/tasks/{taskId}",
+        "definition": {
+          "entityName": "Task",
+          "schema": {
+            "$ref": "#/backend/entities/Task"
+          },
+          "description": "Stores tasks associated with a specific user. Authorization is based on the 'userId' path segment.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user who owns the task."
+            },
+            {
+              "name": "taskId",
+              "description": "The unique identifier for the task."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/labels/{labelId}",
+        "definition": {
+          "entityName": "Label",
+          "schema": {
+            "$ref": "#/backend/entities/Label"
+          },
+          "description": "Stores labels associated with a specific user. Authorization is based on the 'userId' path segment.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user who owns the label."
+            },
+            {
+              "name": "labelId",
+              "description": "The unique identifier for the label."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to ensure secure and scalable task management while adhering to the principles of Authorization Independence, Clarity of Intent, DBAC (Database-Based Access Control), and Rules Are Not Filters (QAPs). It leverages denormalization and structural segregation to simplify security rules and optimize query performance.\n\n*   **Authorization Independence:** Achieved by using path-based ownership for tasks and labels, ensuring each document's access control can be determined without needing to `get()` data from parent documents. User IDs are directly embedded within the document paths, making authorization straightforward.  For example, tasks are stored under `/users/{userId}/tasks/{taskId}`, so the security rules only need to check if `request.auth.uid == userId`.\n*   **Structural Segregation:** Each collection houses documents with similar security needs. User-specific data (tasks, labels) are segregated under their respective user IDs.\n*   **QAPs (Rules are not Filters):** The structure supports secure `list` operations.  Because tasks and labels are located under a user-specific path, listing tasks or labels is secure because the security rules can efficiently verify that the authenticated user is the owner of the data being listed.\n*   **Denormalization:**  While the current structure doesn't explicitly denormalize data *between* entities (e.g., copying user email to task documents), this might be considered if cross-collection queries based on user attributes were required.  Given the simple nature of this app, and the focus on user-owned data, this denormalization seems unnecessary at this point and would add complexity. If the app's needs evolve, we can reconsider.\n*   **DBAC:** Authorization is based on `request.auth.uid` matching user IDs present in the document paths. No custom claims are used."
+  }
+}
