@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -54,13 +55,21 @@ export function TaskForm({ task, isOpen, onOpenChange }: TaskFormProps) {
 
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      title: task?.title || "",
-      description: task?.description || "",
-      deadline: task?.deadline || null,
-      labels: task?.labels || [],
-      status: task?.status || "todo",
-    },
+    defaultValues: task 
+    ? {
+        title: task.title,
+        description: task.description,
+        deadline: task.deadline || null,
+        labels: task.labels || [],
+        status: task.status,
+      }
+    : {
+        title: "",
+        description: "",
+        deadline: null,
+        labels: [],
+        status: "todo",
+      },
   });
 
   const handleSuggestLabels = async () => {
@@ -110,11 +119,11 @@ export function TaskForm({ task, isOpen, onOpenChange }: TaskFormProps) {
         ? await updateTask(task.id, values) 
         : await createTask(values);
 
-      if (result.error) {
+      if (result?.error) {
         toast({
           variant: "destructive",
           title: "An error occurred",
-          description: "Could not save the task. Please try again.",
+          description: result.error,
         });
       } else {
         toast({
@@ -129,7 +138,13 @@ export function TaskForm({ task, isOpen, onOpenChange }: TaskFormProps) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) {
+        form.reset();
+        setSuggestions([]);
+      }
+      onOpenChange(open);
+    }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{task ? "Edit Task" : "Create Task"}</DialogTitle>

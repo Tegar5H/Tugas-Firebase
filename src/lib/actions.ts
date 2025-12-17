@@ -24,7 +24,7 @@ const TaskSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   deadline: z.string().nullable(),
-  labels: z.array(z.string()).optional(),
+  labels: z.array(z.string()),
   status: z.enum(["todo", "in-progress", "done"]).optional(),
 });
 
@@ -82,9 +82,9 @@ export async function createTask(values: z.infer<typeof TaskSchema>) {
   const parsed = TaskSchema.safeParse(values);
 
   if (!parsed.success) {
-    return { error: parsed.error.format() };
+    return { error: parsed.error.format()._errors.join(', ') };
   }
-
+  
   const { title, description, deadline, labels } = parsed.data;
   const userId = auth.currentUser?.uid;
 
@@ -93,21 +93,21 @@ export async function createTask(values: z.infer<typeof TaskSchema>) {
   }
 
   try {
-    await addDoc(collection(db, "tasks"), {
+    const taskData = {
+      userId,
       title,
       description: description ?? "",
       status: "todo",
       deadline: deadline ?? null,
       labels: labels ?? [],
-      userId,
       createdAt: Timestamp.now(),
-    });
+    };
+    await addDoc(collection(db, "tasks"), taskData);
     revalidatePath("/dashboard");
     revalidatePath("/tasks");
     return { success: true };
-  } catch (e) {
-    console.error(e);
-    return { error: "Failed to create task." };
+  } catch (e: any) {
+    return { error: e.message || "Failed to create task." };
   }
 }
 
@@ -115,7 +115,7 @@ export async function updateTask(taskId: string, values: z.infer<typeof TaskSche
     const parsed = TaskSchema.safeParse(values);
 
    if (!parsed.success) {
-    return { error: parsed.error.format() };
+    return { error: parsed.error.format()._errors.join(', ') };
   }
 
   const { title, description, deadline, labels, status } = parsed.data;
@@ -127,19 +127,19 @@ export async function updateTask(taskId: string, values: z.infer<typeof TaskSche
   
   try {
     const taskRef = doc(db, "tasks", taskId);
-    await updateDoc(taskRef, {
+    const taskData = {
       title,
       description: description ?? "",
       deadline: deadline ?? null,
       labels: labels ?? [],
       status: status ?? "todo",
-    });
+    };
+    await updateDoc(taskRef, taskData);
     revalidatePath("/dashboard");
     revalidatePath("/tasks");
     return { success: true };
-  } catch (e) {
-    console.error(e);
-    return { error: "Failed to update task." };
+  } catch (e: any) {
+    return { error: e.message || "Failed to update task." };
   }
 }
 
