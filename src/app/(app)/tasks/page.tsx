@@ -1,27 +1,35 @@
-import { getTasks } from "@/lib/actions";
-import { auth } from "@/lib/firebase";
+"use client";
+
+import { useMemo } from "react";
+import { useUser, useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection } from "firebase/firestore";
+import type { Task } from "@/lib/types";
 import { TaskList } from "@/components/tasks/task-list";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Suspense } from 'react';
 
 export default function TasksPage() {
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const tasksQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return collection(firestore, "users", user.uid, "tasks");
+  }, [user, firestore]);
+
+  const { data: tasks, isLoading } = useCollection<Task>(tasksQuery);
+
   return (
     <>
       <h1 className="text-2xl font-bold tracking-tight">All Tasks</h1>
-      <Suspense fallback={<TasksSkeleton />}>
-        <TasksData />
-      </Suspense>
+      {isLoading ? (
+        <TasksSkeleton />
+      ) : (
+        <TaskList initialTasks={tasks || []} />
+      )}
     </>
   );
 }
 
-async function TasksData() {
-    // This is a simplified way to get UID on server for this project.
-    // In a real app, this should be handled via a secure session.
-    const uid = auth.currentUser?.uid;
-    const tasks = uid ? await getTasks(uid) : [];
-    return <TaskList initialTasks={tasks} />;
-}
 
 function TasksSkeleton() {
     return (

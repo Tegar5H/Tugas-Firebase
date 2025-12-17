@@ -1,24 +1,12 @@
 
 "use server";
 
-import { db, auth } from "@/lib/firebase";
-import {
-  collection,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  getDocs,
-  query,
-  where,
-  Timestamp,
-  orderBy,
-  limit,
-} from "firebase/firestore";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, where, Timestamp, orderBy, limit } from "firebase/firestore";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { Task } from "@/lib/types";
 import { suggestTaskLabels } from "@/ai/flows/suggest-task-labels";
+import { getAuthenticatedAppForUser } from "@/lib/firebase-admin";
 
 const TaskSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -28,18 +16,19 @@ const TaskSchema = z.object({
   status: z.enum(["todo", "in-progress", "done"]).optional(),
 });
 
+
 export async function getTasks(userId: string) {
   if (!userId) return [];
-  const tasksCol = collection(db, "tasks");
-  const q = query(tasksCol, where("userId", "==", userId), orderBy("createdAt", "desc"));
+  const { firestore } = await getAuthenticatedAppForUser();
+  const tasksCol = collection(firestore, "users", userId, "tasks");
+  const q = query(tasksCol, orderBy("createdAt", "desc"));
   const taskSnapshot = await getDocs(q);
   const taskList = taskSnapshot.docs.map(doc => {
       const data = doc.data();
-      // Firestore timestamps need to be converted
       return { 
           id: doc.id, 
           ...data,
-          deadline: data.deadline || null, // Ensure deadline is string or null
+          deadline: data.deadline || null,
           createdAt: data.createdAt,
       } as Task;
   });
@@ -48,13 +37,11 @@ export async function getTasks(userId: string) {
 
 export async function getDashboardTasks(userId: string) {
   if (!userId) return { recent: [], dueToday: [] };
+  const { firestore } = await getAuthenticatedAppForUser();
+  const tasksCol = collection(firestore, "users", userId, "tasks");
 
-  const tasksCol = collection(db, "tasks");
-
-  // Recent tasks
   const recentQuery = query(
     tasksCol,
-    where("userId", "==", userId),
     orderBy("createdAt", "desc"),
     limit(5)
   );
@@ -68,17 +55,20 @@ export async function getDashboardTasks(userId: string) {
       createdAt: data.createdAt,
     } as Task;
   });
-
-  // For "dueToday", we can't effectively query by a string date field for ranges.
-  // This will be left empty as the data type doesn't support the query.
-  // A more robust solution would involve storing deadlines as timestamps.
+  
+  // This part remains ineffective due to the data model, but is kept for structure.
   const dueToday: Task[] = [];
   
   return { recent, dueToday };
 }
 
-
 export async function createTask(values: z.infer<typeof TaskSchema>) {
+  const { auth } = await getAuthenticatedAppForUser();
+
+  if (!auth.uid) {
+    return { error: "User not authenticated." };
+  }
+
   const parsed = TaskSchema.safeParse(values);
 
   if (!parsed.success) {
@@ -86,13 +76,10 @@ export async function createTask(values: z.infer<typeof TaskSchema>) {
   }
   
   const { title, description, deadline, labels } = parsed.data;
-  const userId = auth.currentUser?.uid;
-
-  if (!userId) {
-    return { error: "User not authenticated." };
-  }
+  const userId = auth.uid;
 
   try {
+    const { firestore } = await getAuthenticatedAppForUser();
     const taskData = {
       userId,
       title,
@@ -102,7 +89,7 @@ export async function createTask(values: z.infer<typeof TaskSchema>) {
       labels: labels ?? [],
       createdAt: Timestamp.now(),
     };
-    await addDoc(collection(db, "tasks"), taskData);
+    await addDoc(collection(firestore, "users", userId, "tasks"), taskData);
     revalidatePath("/dashboard");
     revalidatePath("/tasks");
     return { success: true };
@@ -112,21 +99,24 @@ export async function createTask(values: z.infer<typeof TaskSchema>) {
 }
 
 export async function updateTask(taskId: string, values: z.infer<typeof TaskSchema>) {
-    const parsed = TaskSchema.safeParse(values);
+  const { auth } = await getAuthenticatedAppForUser();
+  const userId = auth.uid;
+  
+  if (!userId) {
+    return { error: "User not authenticated." };
+  }
 
-   if (!parsed.success) {
+  const parsed = TaskSchema.safeParse(values);
+
+  if (!parsed.success) {
     return { error: parsed.error.format()._errors.join(', ') };
   }
 
   const { title, description, deadline, labels, status } = parsed.data;
-  const userId = auth.currentUser?.uid;
-
-  if (!userId) {
-    return { error: "User not authenticated." };
-  }
   
   try {
-    const taskRef = doc(db, "tasks", taskId);
+    const { firestore } = await getAuthenticatedAppForUser();
+    const taskRef = doc(firestore, "users", userId, "tasks", taskId);
     const taskData = {
       title,
       description: description ?? "",
@@ -144,33 +134,38 @@ export async function updateTask(taskId: string, values: z.infer<typeof TaskSche
 }
 
 export async function updateTaskStatus(taskId: string, status: 'todo' | 'in-progress' | 'done') {
-  const userId = auth.currentUser?.uid;
+  const { auth } = await getAuthenticatedAppForUser();
+  const userId = auth.uid;
   if (!userId) return { error: "User not authenticated." };
 
   try {
-    const taskRef = doc(db, "tasks", taskId);
+    const { firestore } = await getAuthenticatedAppForUser();
+    const taskRef = doc(firestore, "users", userId, "tasks", taskId);
     await updateDoc(taskRef, { status });
     revalidatePath('/dashboard');
     revalidatePath('/tasks');
     return { success: true };
-  } catch (e) {
+  } catch (e: any) {
     return { error: 'Failed to update task status.' };
   }
 }
 
 export async function deleteTask(taskId: string) {
-  const userId = auth.currentUser?.uid;
+  const { auth } = await getAuthenticatedAppForUser();
+  const userId = auth.uid;
   if (!userId) return { error: "User not authenticated." };
 
   try {
-    await deleteDoc(doc(db, "tasks", taskId));
+    const { firestore } = await getAuthenticatedAppForUser();
+    await deleteDoc(doc(firestore, "users", userId, "tasks", taskId));
     revalidatePath("/dashboard");
     revalidatePath("/tasks");
     return { success: true };
-  } catch (e) {
+  } catch (e: any) {
     return { error: "Failed to delete task." };
   }
 }
+
 
 export async function getLabelSuggestions(title: string, description: string) {
   try {

@@ -3,8 +3,8 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { useAuth } from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -21,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import { Chrome } from 'lucide-react';
+import { initiateEmailSignIn } from "@/firebase";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -30,6 +31,7 @@ const formSchema = z.object({
 export function LoginForm() {
   const { toast } = useToast();
   const router = useRouter();
+  const auth = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
@@ -44,11 +46,8 @@ export function LoginForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
-      toast({
-        title: "Success!",
-        description: "You have been logged in.",
-      });
+      initiateEmailSignIn(auth, values.email, values.password);
+      // Non-blocking, relying on onAuthStateChanged in the provider
       router.push("/dashboard");
     } catch (error: any) {
       toast({
@@ -56,8 +55,7 @@ export function LoginForm() {
         title: "Uh oh! Something went wrong.",
         description: error.message || "There was a problem with your request.",
       });
-    } finally {
-      setIsLoading(false);
+       setIsLoading(false);
     }
   }
 

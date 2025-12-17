@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@/hooks/use-auth";
+import { useUser } from "@/firebase";
 import { useEffect, useState } from "react";
 import type { Task } from "@/lib/types";
 import { getTasks, getDashboardTasks } from "@/lib/actions";
@@ -10,7 +10,7 @@ import { RecentTasks } from "@/components/dashboard/recent-tasks";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user } = useUser();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [dashboardTasks, setDashboardTasks] = useState<{recent: Task[], dueToday: Task[]}>({recent: [], dueToday: []});
   const [loading, setLoading] = useState(true);
