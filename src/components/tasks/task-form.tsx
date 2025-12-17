@@ -53,6 +53,7 @@ export function TaskForm({ task, isOpen, onOpenChange }: TaskFormProps) {
   const [isPending, startTransition] = useTransition();
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -184,7 +185,7 @@ export function TaskForm({ task, isOpen, onOpenChange }: TaskFormProps) {
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>Deadline</FormLabel>
-                  <Popover>
+                  <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button
@@ -207,7 +208,10 @@ export function TaskForm({ task, isOpen, onOpenChange }: TaskFormProps) {
                       <Calendar
                         mode="single"
                         selected={field.value ?? undefined}
-                        onSelect={field.onChange}
+                        onSelect={(date) => {
+                            field.onChange(date);
+                            setIsCalendarOpen(false);
+                        }}
                         initialFocus
                       />
                     </PopoverContent>
