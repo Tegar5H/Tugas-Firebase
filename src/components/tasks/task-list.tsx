@@ -37,17 +37,19 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { deleteTask, updateTaskStatus } from "@/lib/actions";
+import { updateTaskStatus } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
 import Image from "next/image";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { cn } from "@/lib/utils";
-import { useUser } from "@/firebase";
+import { useUser, useFirestore, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
+import { doc } from "firebase/firestore";
 
 type SortOption = "createdAt_desc" | "createdAt_asc";
 
 export function TaskList({ initialTasks }: { initialTasks: Task[] }) {
   const { user } = useUser();
+  const firestore = useFirestore();
   const [filter, setFilter] = useState("all");
   const [sort, setSort] = useState<SortOption>("createdAt_desc");
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -68,28 +70,29 @@ export function TaskList({ initialTasks }: { initialTasks: Task[] }) {
   }
 
   const handleDelete = (taskId: string) => {
-    if (!user) return;
-    startTransition(async () => {
-      const result = await deleteTask(user.uid, taskId);
-      if (result.error) {
-        toast({
-          variant: "destructive",
-          title: "Failed to delete task",
-          description: result.error,
-        });
-      } else {
+    if (!user || !firestore) return;
+    startTransition(() => {
+      try {
+        const taskRef = doc(firestore, "users", user.uid, "tasks", taskId);
+        deleteDocumentNonBlocking(taskRef);
         toast({
           title: "Task deleted",
+        });
+      } catch (error) {
+         toast({
+          variant: "destructive",
+          title: "Failed to delete task",
         });
       }
     });
   };
 
   const handleStatusChange = (taskId: string, currentStatus: Task['status']) => {
-    if (!user) return;
-    startTransition(async () => {
+    if (!user || !firestore) return;
+    startTransition(() => {
       const newStatus = currentStatus === 'done' ? 'todo' : 'done';
-      await updateTaskStatus(user.uid, taskId, newStatus);
+      const taskRef = doc(firestore, "users", user.uid, "tasks", taskId);
+      updateDocumentNonBlocking(taskRef, { status: newStatus });
     });
   };
 

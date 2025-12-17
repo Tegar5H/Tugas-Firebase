@@ -1,7 +1,7 @@
 
 "use server";
 
-import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, Timestamp, orderBy, limit } from "firebase/firestore";
+import { collection, doc, getDocs, query, Timestamp, orderBy, limit } from "firebase/firestore";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { Task } from "@/lib/types";
@@ -62,70 +62,10 @@ export async function getDashboardTasks(userId: string) {
   return { recent, dueToday };
 }
 
-export async function createTask(userId: string, values: z.infer<typeof TaskSchema>) {
-  if (!userId) {
-    return { error: "User not authenticated." };
-  }
+// NOTE: createTask is now handled client-side in task-form.tsx
 
-  const parsed = TaskSchema.safeParse(values);
+// NOTE: updateTask is now handled client-side in task-form.tsx
 
-  if (!parsed.success) {
-    return { error: parsed.error.format()._errors.join(', ') };
-  }
-  
-  const { title, description, deadline, labels } = parsed.data;
-
-  try {
-    const { firestore } = initializeFirebase();
-    const taskData = {
-      userId,
-      title,
-      description: description ?? "",
-      status: "todo",
-      deadline: deadline ?? null,
-      labels: labels ?? [],
-      createdAt: Timestamp.now(),
-    };
-    await addDoc(collection(firestore, "users", userId, "tasks"), taskData);
-    revalidatePath("/dashboard");
-    revalidatePath("/tasks");
-    return { success: true };
-  } catch (e: any) {
-    return { error: e.message || "Failed to create task." };
-  }
-}
-
-export async function updateTask(userId: string, taskId: string, values: z.infer<typeof TaskSchema>) {
-  if (!userId) {
-    return { error: "User not authenticated." };
-  }
-
-  const parsed = TaskSchema.safeParse(values);
-
-  if (!parsed.success) {
-    return { error: parsed.error.format()._errors.join(', ') };
-  }
-
-  const { title, description, deadline, labels, status } = parsed.data;
-  
-  try {
-    const { firestore } = initializeFirebase();
-    const taskRef = doc(firestore, "users", userId, "tasks", taskId);
-    const taskData = {
-      title,
-      description: description ?? "",
-      deadline: deadline ?? null,
-      labels: labels ?? [],
-      status: status ?? "todo",
-    };
-    await updateDoc(taskRef, taskData);
-    revalidatePath("/dashboard");
-    revalidatePath("/tasks");
-    return { success: true };
-  } catch (e: any) {
-    return { error: e.message || "Failed to update task." };
-  }
-}
 
 export async function updateTaskStatus(userId: string, taskId: string, status: 'todo' | 'in-progress' | 'done') {
   if (!userId) return { error: "User not authenticated." };
@@ -133,7 +73,7 @@ export async function updateTaskStatus(userId: string, taskId: string, status: '
   try {
     const { firestore } = initializeFirebase();
     const taskRef = doc(firestore, "users", userId, "tasks", taskId);
-    await updateDoc(taskRef, { status });
+    await doc(taskRef, { status }).update();
     revalidatePath('/dashboard');
     revalidatePath('/tasks');
     return { success: true };
@@ -147,7 +87,7 @@ export async function deleteTask(userId: string, taskId: string) {
 
   try {
     const { firestore } = initializeFirebase();
-    await deleteDoc(doc(firestore, "users", userId, "tasks", taskId));
+    await doc(firestore, "users", userId, "tasks", taskId).delete();
     revalidatePath("/dashboard");
     revalidatePath("/tasks");
     return { success: true };
