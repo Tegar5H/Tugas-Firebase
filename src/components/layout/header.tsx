@@ -1,5 +1,5 @@
 import { UserNav } from "@/components/layout/user-nav";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import { SidebarNav } from "./sidebar";
@@ -17,6 +17,7 @@ export function Header() {
         </SheetTrigger>
         <SheetContent side="left" className="sm:max-w-xs">
           <nav className="grid gap-6 text-lg font-medium">
+            <SheetTitle className="sr-only">Main Menu</SheetTitle>
             <Logo />
             <SidebarNav isMobile={true} />
           </nav>
