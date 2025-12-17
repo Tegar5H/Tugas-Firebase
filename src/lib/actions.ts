@@ -1,3 +1,4 @@
+
 "use server";
 
 import { db, auth } from "@/lib/firebase";
@@ -111,6 +112,7 @@ export async function createTask(formData: FormData) {
     revalidatePath("/tasks");
     return { success: true };
   } catch (e) {
+    console.error(e);
     return { error: "Failed to create task." };
   }
 }
@@ -122,7 +124,7 @@ export async function updateTask(taskId: string, formData: FormData) {
     description: values.description,
     deadline: values.deadline || null,
     labels: values.labels ? JSON.parse(values.labels as string) : [],
-    status: values.status
+    status: values.status as any,
   });
 
    if (!parsed.success) {
@@ -149,6 +151,7 @@ export async function updateTask(taskId: string, formData: FormData) {
     revalidatePath("/tasks");
     return { success: true };
   } catch (e) {
+    console.error(e);
     return { error: "Failed to update task." };
   }
 }
