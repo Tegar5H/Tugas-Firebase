@@ -4,7 +4,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 
 import { Button } from "@/components/ui/button";
@@ -180,7 +179,7 @@ export function TaskForm({ task, isOpen, onOpenChange }: TaskFormProps) {
                 <FormItem>
                   <FormLabel>Deadline</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Tomorrow at 5pm" {...field} value={field.value ?? ""} />
+                    <Input type="text" placeholder="e.g., Tomorrow at 5pm" {...field} value={field.value ?? ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
