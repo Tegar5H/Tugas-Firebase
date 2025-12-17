@@ -84,7 +84,7 @@ service cloud.firestore {
      * after it has been created, preventing tasks from being reassigned.
      */
     function isTaskDataImmutable() {
-      return request.resource.data.userId == resource.data.id;
+      return request.resource.data.userId == resource.data.userId;
     }
 
     /**
@@ -100,7 +100,7 @@ service cloud.firestore {
      * after it has been created, preventing labels from being reassigned.
      */
     function isLabelDataImmutable() {
-      return request.resource.data.userId == resource.data.id;
+      return request.resource.data.userId == resource.data.userId;
     }
 
     // --------------------------------------------------------------------
