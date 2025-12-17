@@ -1,7 +1,7 @@
 
 "use server";
 
-import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, Timestamp, orderBy, limit } from "firebase/firestore";
+import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, Timestamp, orderBy, limit } from "firebase/firestore";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { Task } from "@/lib/types";
