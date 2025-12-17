@@ -78,14 +78,7 @@ export async function getDashboardTasks(userId: string) {
 }
 
 
-export async function createTask(formData: FormData) {
-  const values = {
-    title: formData.get('title'),
-    description: formData.get('description'),
-    deadline: formData.get('deadline') || null,
-    labels: formData.has('labels') ? JSON.parse(formData.get('labels') as string) : [],
-  };
-
+export async function createTask(values: z.infer<typeof TaskSchema>) {
   const parsed = TaskSchema.safeParse(values);
 
   if (!parsed.success) {
@@ -118,15 +111,7 @@ export async function createTask(formData: FormData) {
   }
 }
 
-export async function updateTask(taskId: string, formData: FormData) {
-    const values = {
-        title: formData.get('title'),
-        description: formData.get('description'),
-        deadline: formData.get('deadline') || null,
-        labels: formData.has('labels') ? JSON.parse(formData.get('labels') as string) : [],
-        status: formData.get('status') || 'todo',
-    };
-    
+export async function updateTask(taskId: string, values: z.infer<typeof TaskSchema>) {
     const parsed = TaskSchema.safeParse(values);
 
    if (!parsed.success) {

@@ -38,6 +38,8 @@ const formSchema = z.object({
   status: z.enum(["todo", "in-progress", "done"]).optional(),
 });
 
+type TaskFormValues = z.infer<typeof formSchema>;
+
 type TaskFormProps = {
   task?: Task;
   isOpen: boolean;
@@ -50,7 +52,7 @@ export function TaskForm({ task, isOpen, onOpenChange }: TaskFormProps) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const { toast } = useToast();
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<TaskFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: task?.title || "",
@@ -102,20 +104,11 @@ export function TaskForm({ task, isOpen, onOpenChange }: TaskFormProps) {
   };
 
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
+  const onSubmit = (values: TaskFormValues) => {
     startTransition(async () => {
-      const formData = new FormData();
-      formData.append("title", values.title);
-      formData.append("description", values.description || "");
-      if (values.deadline) {
-        formData.append("deadline", values.deadline);
-      }
-      formData.append("labels", JSON.stringify(values.labels));
-      if (task) {
-        formData.append("status", values.status || 'todo');
-      }
-
-      const result = task ? await updateTask(task.id, formData) : await createTask(formData);
+      const result = task 
+        ? await updateTask(task.id, values) 
+        : await createTask(values);
 
       if (result.error) {
         toast({
