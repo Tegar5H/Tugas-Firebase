@@ -79,13 +79,14 @@ export async function getDashboardTasks(userId: string) {
 
 
 export async function createTask(formData: FormData) {
-  const values = Object.fromEntries(formData.entries());
-  const parsed = TaskSchema.safeParse({
-    title: values.title,
-    description: values.description,
-    deadline: values.deadline || null,
-    labels: values.labels ? JSON.parse(values.labels as string) : [],
-  });
+  const values = {
+    title: formData.get('title'),
+    description: formData.get('description'),
+    deadline: formData.get('deadline') || null,
+    labels: formData.has('labels') ? JSON.parse(formData.get('labels') as string) : [],
+  };
+
+  const parsed = TaskSchema.safeParse(values);
 
   if (!parsed.success) {
     return { error: parsed.error.format() };
@@ -118,14 +119,15 @@ export async function createTask(formData: FormData) {
 }
 
 export async function updateTask(taskId: string, formData: FormData) {
-  const values = Object.fromEntries(formData.entries());
-  const parsed = TaskSchema.safeParse({
-    title: values.title,
-    description: values.description,
-    deadline: values.deadline || null,
-    labels: values.labels ? JSON.parse(values.labels as string) : [],
-    status: values.status as any,
-  });
+    const values = {
+        title: formData.get('title'),
+        description: formData.get('description'),
+        deadline: formData.get('deadline') || null,
+        labels: formData.has('labels') ? JSON.parse(formData.get('labels') as string) : [],
+        status: formData.get('status') || 'todo',
+    };
+    
+    const parsed = TaskSchema.safeParse(values);
 
    if (!parsed.success) {
     return { error: parsed.error.format() };
